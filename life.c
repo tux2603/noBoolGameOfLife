@@ -5,15 +5,28 @@
 #include <time.h>
 
 #ifdef _WIN32
-#include <Windows.h>
+#    include <Windows.h>
 #else
-#include <unistd.h>
+#    include <unistd.h>
 #endif
 
+// For technical reasons this has to be a power of 2
 #define BOARD_SIZE 64
 
-void printBoard(uint8_t*, uint16_t, char, char, uint16_t);
-void stepBoard(uint8_t**, uint16_t);
+void fillBoard(uint8_t *, uint16_t, uint32_t);
+void fillBoardTerminate(uint8_t *, uint16_t, uint32_t);
+
+void printBoard(uint8_t *, uint16_t, char, char, uint32_t);
+void printBoardTerminate(uint8_t *, uint16_t, char, char, uint32_t);
+
+void stepBoard(uint8_t *, uint16_t, uint32_t);
+void stepBoardTerminate(uint8_t *, uint16_t, uint32_t);
+
+void (*fillBoardFunctions[2])(uint8_t *, uint16_t, uint32_t) = {&fillBoard, &fillBoardTerminate};
+void (*printBoardFunctions[2])(uint8_t *, uint16_t, char, char, uint32_t) = {&printBoard, &printBoardTerminate};
+void (*stepBoardFunctions[2])(uint8_t *, uint16_t, uint32_t) = {&stepBoard, &stepBoardTerminate};
+
+
 uint16_t wrapPow2(uint16_t, uint16_t);
 
 
@@ -23,82 +36,87 @@ int main() {
     uint8_t *board = (uint8_t *)malloc(sizeof(uint8_t) * BOARD_SIZE * BOARD_SIZE);
 
     // Fill the board with a random initial state
-    for (uint32_t i = 0; i ^ (BOARD_SIZE * BOARD_SIZE); ++i) {
-        uint16_t cellStateSeed = rand();
-        board[i] = (cellStateSeed & (cellStateSeed >> 1)) & 0x1;
-    }
+    fillBoard(board, BOARD_SIZE, 0);
 
-    for(;;) {
-        printBoard(board, BOARD_SIZE, ' ', '#', 2);
-        stepBoard(&board, BOARD_SIZE);
-        usleep(100000);
-    }
-    
+TICK:
+    printBoard(board, BOARD_SIZE, ' ', '#', 0);
+    stepBoard(board, BOARD_SIZE, 0);
+    usleep(100000);
+    goto TICK;
+
     return 0;
 }
 
-void printBoard(uint8_t *board, uint16_t boardSize, char deadCell, char liveCell, uint16_t cellCharCount) {
-    // Create a character buffer to hold the printable board
-    char* boardText = (char *)malloc(sizeof(char) * (boardSize * boardSize * cellCharCount) + boardSize + 1);
+void fillBoard(uint8_t *board, uint16_t boardSize, uint32_t currentIdx) {
+    uint16_t cellStateSeed = rand();
+    board[currentIdx] = (cellStateSeed & (cellStateSeed >> 1)) & 0x1;
 
-    // Zero terminate the string
-    boardText[boardSize * boardSize * cellCharCount + boardSize] = '\0';
-    boardText[boardSize * boardSize * cellCharCount + boardSize - 1] = '\n';
+    uint32_t nextFuncIdx = ((currentIdx + 1) & (boardSize * boardSize)) - (boardSize * boardSize);
+    nextFuncIdx = ~(nextFuncIdx >> 31) & 0x1;
 
-    // Place new line characters in the necessary locations
-    for (uint32_t i = boardSize * cellCharCount; i ^ (boardSize * boardSize * cellCharCount + boardSize - 1); i += boardSize * cellCharCount + 1) {
-        boardText[i] = '\n';
-    }
-
-    // Get the difference in the values between the deadCell char and the liveCell char
-    int8_t cellDifference = liveCell - deadCell;
-
-    for (uint16_t row = 0; row ^ boardSize; ++row) {
-        for (uint16_t col = 0; col ^ boardSize; ++col) {
-            // Get the chractaer to be written into this cell
-            char cellChar = deadCell + cellDifference * (board[col + row * boardSize] & 0x1);
-            
-            for(uint16_t c = 0; c ^ cellCharCount; ++c) {
-                boardText[(col * cellCharCount) + c + row * (boardSize * cellCharCount + 1)] = cellChar;
-            }
-        }
-    }
-
-    // Print the board
-    printf("\033[H%s", boardText);
-
-    // Free the memory used by the board buffer
-    free(boardText);
+    fillBoardFunctions[nextFuncIdx](board, boardSize, currentIdx + 1);
 }
 
-void stepBoard(uint8_t **board, uint16_t boardSize) {
-
-    // Get the next state of each cell
-    for (uint16_t row = 0; row ^ boardSize; ++row) {
-        for (uint16_t col = 0; col ^ boardSize; ++col) {
-            uint8_t neighbors = 0;
-
-            neighbors += (*board)[wrapPow2(col - 1, boardSize) + wrapPow2(row - 1, boardSize) * boardSize] & 0x1;
-            neighbors += (*board)[wrapPow2(col - 1, boardSize) + row * boardSize] & 0x1;
-            neighbors += (*board)[wrapPow2(col - 1, boardSize) + wrapPow2(row + 1, boardSize) * boardSize] & 0x1;
-            neighbors += (*board)[col + wrapPow2(row - 1, boardSize) * boardSize] & 0x1;
-            neighbors += (*board)[col + wrapPow2(row + 1, boardSize) * boardSize] & 0x1;
-            neighbors += (*board)[wrapPow2(col + 1, boardSize) + wrapPow2(row - 1, boardSize) * boardSize] & 0x1;
-            neighbors += (*board)[wrapPow2(col + 1, boardSize) + row * boardSize] & 0x1;
-            neighbors += (*board)[wrapPow2(col + 1, boardSize) + wrapPow2(row + 1, boardSize) * boardSize] & 0x1;
-        
-            (*board)[col + row * boardSize] |= (~neighbors >> 1 & neighbors & (((*board)[col + row * boardSize] & 0x1) | neighbors) << 1) & 0x2;
-        }
-    }
-
-    //Update the state of each cell
-    for (uint16_t row = 0; row ^ boardSize; ++row) {
-        for (uint16_t col = 0; col ^ boardSize; ++col) {
-            (*board)[col + row * boardSize] >>= 1;
-        }
-    }
+void fillBoardTerminate(uint8_t *board, uint16_t boardSize, uint32_t currentIdx) {
+    return;
 }
 
-uint16_t wrapPow2(uint16_t value, uint16_t wrapPoint) {
-    return value & (wrapPoint - 1);
+void printBoard(uint8_t *board, uint16_t boardSize, char deadCell, char liveCell, uint32_t currentIdx) {
+    char cellChars[2] = {deadCell, liveCell};
+    uint8_t cellState = board[currentIdx] & 0x1;
+
+    printf("%c%c", cellChars[cellState], cellChars[cellState]);
+
+    // If this is one less than a multiple of the board size, print a newline
+    char *newLine = "\n";
+    uint32_t endLineIdx = ((currentIdx % boardSize) + 1) - boardSize;
+    endLineIdx = endLineIdx >> 31;
+
+    // printf("Index is %d, printing starting at character %d\n", currentIdx, endLineIdx);
+
+    printf("%s", newLine + endLineIdx);
+
+    uint32_t nextFuncIdx = ((currentIdx + 1) & (boardSize * boardSize)) - (boardSize * boardSize);
+    nextFuncIdx = ~(nextFuncIdx >> 31) & 0x1;
+
+    printBoardFunctions[nextFuncIdx](board, boardSize, deadCell, liveCell, currentIdx + 1);
+}
+
+void printBoardTerminate(uint8_t *board, uint16_t boardSize, char deadCell, char liveCell, uint32_t currentIdx) {
+    printf("\033[H");
+    fflush(stdout);
+    return;
+}
+
+void stepBoard(uint8_t *board, uint16_t boardSize, uint32_t currentIdx) {
+    // Get the row and column of the current cell
+    uint16_t row = currentIdx / boardSize;
+    uint16_t col = currentIdx % boardSize;
+
+    // Get the neighbors of the current cell
+    uint8_t neighbors = 0;
+    neighbors += board[((col - 1) & (boardSize - 1)) + ((row - 1) & (boardSize - 1)) * boardSize] & 0x1;
+    neighbors += board[((col - 1) & (boardSize - 1)) + row * boardSize] & 0x1;
+    neighbors += board[((col - 1) & (boardSize - 1)) + ((row + 1) & (boardSize - 1)) * boardSize] & 0x1;
+    neighbors += board[col + ((row - 1) & (boardSize - 1)) * boardSize] & 0x1;
+    neighbors += board[col + ((row + 1) & (boardSize - 1)) * boardSize] & 0x1;
+    neighbors += board[((col + 1) & (boardSize - 1)) + ((row - 1) & (boardSize - 1)) * boardSize] & 0x1;
+    neighbors += board[((col + 1) & (boardSize - 1)) + row * boardSize] & 0x1;
+    neighbors += board[((col + 1) & (boardSize - 1)) + ((row + 1) & (boardSize - 1)) * boardSize] & 0x1;
+
+    // Store the next state of the current cell
+    board[currentIdx] |= (~neighbors >> 1 & neighbors & ((board[currentIdx] & 0x1) | neighbors) << 1) & 0x2;
+
+    uint32_t nextFuncIdx = ((currentIdx + 1) & (boardSize * boardSize)) - (boardSize * boardSize);
+    nextFuncIdx = ~(nextFuncIdx >> 31) & 0x1;
+
+    // Call the appropriate function
+    stepBoardFunctions[nextFuncIdx](board, boardSize, currentIdx + 1);
+
+    // Update the current cell index
+    board[currentIdx] >>= 1;
+}
+
+void stepBoardTerminate(uint8_t *board, uint16_t boardSize, uint32_t currentIdx) {
+    return;
 }
