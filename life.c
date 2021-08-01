@@ -35,7 +35,7 @@ int main() {
     fillBoard(board, BOARD_SIZE, 0);
 
 TICK:
-    printBoard(board, BOARD_SIZE, ' ', '#', 0);
+    printBoard(board, BOARD_SIZE, '#', ' ', 0);
     stepBoard(board, BOARD_SIZE, 0);
     usleep(100000);
     goto TICK;
@@ -57,11 +57,10 @@ void fillBoardTerminate(uint8_t *board, uint16_t boardSize, uint32_t currentIdx)
     return;
 }
 
-void printBoard(uint8_t *board, uint16_t boardSize, char deadCell, char liveCell, uint32_t currentIdx) {
-    char cellChars[2] = {deadCell, liveCell};
+void printBoard(uint8_t *board, uint16_t boardSize, char liveCell, char deadCell, uint32_t currentIdx) {
     uint8_t cellState = board[currentIdx] & 0x1;
 
-    printf("%c%c", cellChars[cellState], cellChars[cellState]);
+    printf("%c%c", (&deadCell)[cellState], (&deadCell)[cellState]);
 
     // If this is one less than a multiple of the board size, print a newline
     char *newLine = "\n";
@@ -75,7 +74,7 @@ void printBoard(uint8_t *board, uint16_t boardSize, char deadCell, char liveCell
     uint32_t nextFuncIdx = ((currentIdx + 1) & (boardSize * boardSize)) - (boardSize * boardSize);
     nextFuncIdx = ~(nextFuncIdx >> 31) & 0x1;
 
-    printBoardFunctions[nextFuncIdx](board, boardSize, deadCell, liveCell, currentIdx + 1);
+    printBoardFunctions[nextFuncIdx](board, boardSize, liveCell, deadCell, currentIdx + 1);
 }
 
 void printBoardTerminate(uint8_t *board, uint16_t boardSize, char deadCell, char liveCell, uint32_t currentIdx) {
