@@ -26,10 +26,6 @@ void (*fillBoardFunctions[2])(uint8_t *, uint16_t, uint32_t) = {&fillBoard, &fil
 void (*printBoardFunctions[2])(uint8_t *, uint16_t, char, char, uint32_t) = {&printBoard, &printBoardTerminate};
 void (*stepBoardFunctions[2])(uint8_t *, uint16_t, uint32_t) = {&stepBoard, &stepBoardTerminate};
 
-
-uint16_t wrapPow2(uint16_t, uint16_t);
-
-
 int main() {
     srand(time(NULL));
 
