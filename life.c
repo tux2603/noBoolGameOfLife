@@ -63,13 +63,10 @@ void printBoard(uint8_t *board, uint16_t boardSize, char liveCell, char deadCell
     printf("%c%c", (&deadCell)[cellState], (&deadCell)[cellState]);
 
     // If this is one less than a multiple of the board size, print a newline
-    char *newLine = "\n";
     uint32_t endLineIdx = ((currentIdx % boardSize) + 1) - boardSize;
     endLineIdx = endLineIdx >> 31;
 
-    // printf("Index is %d, printing starting at character %d\n", currentIdx, endLineIdx);
-
-    printf("%s", newLine + endLineIdx);
+    printf("%s", (char *)"\n" + endLineIdx);
 
     uint32_t nextFuncIdx = ((currentIdx + 1) & (boardSize * boardSize)) - (boardSize * boardSize);
     nextFuncIdx = ~(nextFuncIdx >> 31) & 0x1;
